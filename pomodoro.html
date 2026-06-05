@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍅 番茄钟</title>
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface2: #222240;
+    --text: #e0e0e0;
+    --text2: #a0a0b8;
+    --accent-focus: #e85d5d;
+    --accent-short: #5dbd7a;
+    --accent-long: #5d9ce8;
+    --accent-focus-dim: rgba(232, 93, 93, 0.15);
+    --accent-short-dim: rgba(93, 189, 122, 0.15);
+    --accent-long-dim: rgba(93, 156, 232, 0.15);
+    --radius: 16px;
+    --transition: 0.3s ease;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text);
+  }
+
+  .btn-icon {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+  }
+  .btn-icon:hover { background: #2e2e52; transform: scale(1.05); }
+  .btn-icon:active { transform: scale(0.95); }
+
+  /* ---- Timer Ring ---- */
+  .timer-wrapper {
+    position: relative;
+    width: 300px; height: 300px;
+  }
+
+  .timer-ring {
+    transform: rotate(-90deg);
+    width: 300px; height: 300px;
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: var(--surface2);
+    stroke-width: 8;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--accent-focus);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke 0.5s ease, stroke-dashoffset 0.3s linear;
+  }
+
+  .ring-progress.focus { stroke: var(--accent-focus); }
+  .ring-progress.shortBreak { stroke: var(--accent-short); }
+  .ring-progress.longBreak { stroke: var(--accent-long); }
+
+  .timer-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .timer-time {
+    font-size: 64px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .timer-label {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 4px 16px;
+    border-radius: 20px;
+    transition: var(--transition);
+  }
+
+  .timer-label.focus {
+    color: var(--accent-focus);
+    background: var(--accent-focus-dim);
+  }
+  .timer-label.shortBreak {
+    color: var(--accent-short);
+    background: var(--accent-short-dim);
+  }
+  .timer-label.longBreak {
+    color: var(--accent-long);
+    background: var(--accent-long-dim);
+  }
+
+  /* ---- Progress ---- */
+  .progress {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .progress-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .progress-card .label {
+    font-size: 12px;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  .progress-card .value {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .progress-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  /* ---- Controls ---- */
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .btn {
+    height: 48px;
+    border-radius: 24px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+    transition: var(--transition);
+    padding: 0 24px;
+    font-family: inherit;
+  }
+
+  .btn:active { transform: scale(0.96); }
+
+  .btn-primary {
+    min-width: 120px;
+    color: #fff;
+  }
+  .btn-primary.focus { background: var(--accent-focus); }
+  .btn-primary.shortBreak { background: var(--accent-short); }
+  .btn-primary.longBreak { background: var(--accent-long); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    min-width: 52px;
+    padding: 0;
+    border-radius: 50%;
+    width: 48px;
+  }
+  .btn-secondary:hover { background: #2e2e52; }
+
+  /* ---- Settings Modal ---- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 85vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transform: translateY(10px);
+    transition: transform 0.3s ease;
+  }
+
+  .overlay.open .modal {
+    transform: translateY(0);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .modal-close {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+  }
+  .modal-close:hover { background: #2e2e52; }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .form-input {
+    flex: 1;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 16px;
+    padding: 0 14px;
+    font-family: inherit;
+    text-align: center;
+    transition: var(--transition);
+    -moz-appearance: textfield;
+  }
+  .form-input::-webkit-outer-spin-button,
+  .form-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent-long);
+    box-shadow: 0 0 0 3px rgba(93, 156, 232, 0.15);
+  }
+
+  .form-unit {
+    font-size: 13px;
+    color: var(--text2);
+    min-width: 32px;
+  }
+
+  .form-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 4px 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn-save {
+    flex: 1;
+    height: 44px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent-long);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+  .btn-save:hover { filter: brightness(1.1); }
+  .btn-save:active { transform: scale(0.97); }
+
+  .btn-reset-daily {
+    flex: 1;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: var(--text2);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+  .btn-reset-daily:hover { color: var(--accent-focus); border-color: var(--accent-focus); }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface2);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: transform 0.3s ease;
+    z-index: 200;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ---- Pulse animation for timer end ---- */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .timer-time.ending {
+    animation: pulse 0.8s ease-in-out 3;
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 400px) {
+    .timer-wrapper { width: 240px; height: 240px; }
+    .timer-ring { width: 240px; height: 240px; }
+    .timer-time { font-size: 50px; }
+    .container { padding: 16px; gap: 20px; }
+    .progress { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="title">🍅 番茄钟</div>
+    <button class="btn-icon" id="btnSettings" title="设置">⚙️</button>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-wrapper">
+    <svg class="timer-ring" viewBox="0 0 300 300">
+      <circle class="ring-bg" cx="150" cy="150" r="140"/>
+      <circle class="ring-progress focus" id="ringProgress" cx="150" cy="150" r="140"
+              stroke-dasharray="879.6" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-content">
+      <div class="timer-time" id="timerDisplay">25:00</div>
+      <div class="timer-label focus" id="stateLabel">专注</div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress">
+    <div class="progress-card">
+      <span class="label">大轮</span>
+      <span class="value" id="roundInfo">1 / 5</span>
+    </div>
+    <div class="progress-card">
+      <span class="label">番茄</span>
+      <span class="value" id="pomodoroInfo">1 / 4</span>
+    </div>
+    <div class="progress-card">
+      <span class="label">今日完成</span>
+      <span class="value" id="todayPomodoros">0 🍅</span>
+    </div>
+    <div class="progress-card">
+      <span class="label">今日专注</span>
+      <span class="value" id="todayFocusTime">0 分钟</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-secondary" id="btnReset" title="重置 (R)">↺</button>
+    <button class="btn btn-primary focus" id="btnStart" title="开始 / 暂停 (空格)">▶ 开始</button>
+    <button class="btn btn-secondary" id="btnSkip" title="跳过 (S)">⏭</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ 设置</div>
+      <button class="modal-close" id="btnClose">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">⏰ 专注时长（分钟）</label>
+      <div class="form-row">
+        <input class="form-input" type="number" id="setFocus" min="1" max="120" value="25">
+        <span class="form-unit">分钟</span>
+      </div>
+    </div>
+
+    <div class="form-divider"></div>
+
+    <div class="form-group">
+      <label class="form-label">☕ 短休息时长（分钟）</label>
+      <div class="form-row">
+        <input class="form-input" type="number" id="setShortBreak" min="1" max="60" value="5">
+        <span class="form-unit">分钟</span>
+      </div>
+    </div>
+
+    <div class="form-divider"></div>
+
+    <div class="form-group">
+      <label class="form-label">😴 长休息时长（分钟）</label>
+      <div class="form-row">
+        <input class="form-input" type="number" id="setLongBreak" min="1" max="120" value="15">
+        <span class="form-unit">分钟</span>
+      </div>
+    </div>
+
+    <div class="form-divider"></div>
+
+    <div class="form-group">
+      <label class="form-label">🔄 每大轮番茄数</label>
+      <div class="form-row">
+        <input class="form-input" type="number" id="setPomodorosPerRound" min="1" max="10" value="4">
+        <span class="form-unit">个</span>
+      </div>
+    </div>
+
+    <div class="form-divider"></div>
+
+    <div class="form-group">
+      <label class="form-label">🎯 每日目标大轮数</label>
+      <div class="form-row">
+        <input class="form-input" type="number" id="setDailyGoal" min="1" max="20" value="5">
+        <span class="form-unit">轮</span>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-reset-daily" id="btnResetDaily">🗑 重置今日数据</button>
+      <button class="btn-save" id="btnSave">✓ 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  // ──────────────────────────────────────
+  // DOM refs
+  // ──────────────────────────────────────
+  const $timer   = document.getElementById('timerDisplay');
+  const $label   = document.getElementById('stateLabel');
+  const $ring    = document.getElementById('ringProgress');
+  const $btnStart = document.getElementById('btnStart');
+  const $round   = document.getElementById('roundInfo');
+  const $pom     = document.getElementById('pomodoroInfo');
+  const $todayP  = document.getElementById('todayPomodoros');
+  const $todayT  = document.getElementById('todayFocusTime');
+  const $toast   = document.getElementById('toast');
+  const $overlay = document.getElementById('overlay');
+
+  const CIRCUMFERENCE = 2 * Math.PI * 140; // ~879.6
+
+  // ──────────────────────────────────────
+  // Settings (defaults)
+  // ──────────────────────────────────────
+  const STORAGE_KEY = 'pomodoro_settings';
+  const DAILY_KEY_PREFIX = 'pomodoro_daily_';
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return {
+      focusDuration: 25,
+      shortBreakDuration: 5,
+      longBreakDuration: 15,
+      pomodorosPerRound: 4,
+      dailyGoal: 5
+    };
+  }
+
+  function saveSettings(s) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  }
+
+  let settings = loadSettings();
+
+  // ──────────────────────────────────────
+  // Daily stats
+  // ──────────────────────────────────────
+  function getDailyKey() {
+    const d = new Date();
+    return DAILY_KEY_PREFIX + d.getFullYear() + '-' +
+           String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+  }
+
+  function loadDaily() {
+    try {
+      const raw = localStorage.getItem(getDailyKey());
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return { completedPomodoros: 0, totalFocusSeconds: 0 };
+  }
+
+  function saveDaily(d) {
+    localStorage.setItem(getDailyKey(), JSON.stringify(d));
+  }
+
+  let daily = loadDaily();
+
+  // ──────────────────────────────────────
+  // State machine
+  // ──────────────────────────────────────
+  // Possible states: 'focus' | 'shortBreak' | 'longBreak'
+  const STATE_META = {
+    focus:      { label: '专注', cls: 'focus' },
+    shortBreak: { label: '短休息', cls: 'shortBreak' },
+    longBreak:  { label: '长休息', cls: 'longBreak' }
+  };
+
+  let state        = 'focus';           // current phase
+  let currentRound = 1;                 // 1-based
+  let currentPom   = 1;                 // 1-based, within round
+  let timeTotal    = settings.focusDuration * 60;  // total seconds for this session
+  let timeLeft     = timeTotal;
+  let isRunning    = false;
+  let endTime      = null;             // Date.now() + timeLeft*1000 when running
+  let timerId      = null;
+  let alarmId      = null;             // for repeating alarm
+
+  // ──────────────────────────────────────
+  // Audio
+  // ──────────────────────────────────────
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+  }
+
+  function playBeep(freq, duration, startTime) {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.3, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
+  function playAlarm() {
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    // Pleasant 3-note ascending pattern
+    playBeep(523, 0.2, now);        // C5
+    playBeep(659, 0.2, now + 0.2);  // E5
+    playBeep(784, 0.4, now + 0.4);  // G5
+  }
+
+  function playAlarmRepeat() {
+    playAlarm();
+    alarmId = setInterval(playAlarm, 2000);
+  }
+
+  function stopAlarm() {
+    if (alarmId) {
+      clearInterval(alarmId);
+      alarmId = null;
+    }
+  }
+
+  // ──────────────────────────────────────
+  // Timer engine
+  // ──────────────────────────────────────
+  function getStateDuration() {
+    switch (state) {
+      case 'focus':      return settings.focusDuration * 60;
+      case 'shortBreak': return settings.shortBreakDuration * 60;
+      case 'longBreak':  return settings.longBreakDuration * 60;
+      default: return 25 * 60;
+    }
+  }
+
+  function resetTimerForState() {
+    timeTotal = getStateDuration();
+    timeLeft  = timeTotal;
+    endTime   = null;
+  }
+
+  function startTimer() {
+    if (isRunning) return;
+    stopAlarm();
+    isRunning = true;
+    endTime = Date.now() + timeLeft * 1000;
+    updateUI();
+    timerId = setInterval(tick, 200);
+    updateStartButton();
+    // Request notification permission proactively
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function pauseTimer() {
+    if (!isRunning) return;
+    isRunning = false;
+    if (endTime) {
+      timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      endTime = null;
+    }
+    if (timerId) { clearInterval(timerId); timerId = null; }
+    updateUI();
+    updateStartButton();
+  }
+
+  function resetTimer() {
+    stopAlarm();
+    pauseTimer();
+    resetTimerForState();
+    updateUI();
+    updateStartButton();
+  }
+
+  function skipSession() {
+    stopAlarm();
+    pauseTimer();
+    handleSessionComplete();
+  }
+
+  function tick() {
+    if (!isRunning || !endTime) return;
+    const now = Date.now();
+    const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+    if (remaining !== timeLeft) {
+      timeLeft = remaining;
+      updateTimerDisplay();
+    }
+    if (timeLeft <= 0) {
+      handleSessionComplete();
+    }
+  }
+
+  function handleSessionComplete() {
+    pauseTimer();
+
+    if (state === 'focus') {
+      // Completed a focus session!
+      daily.completedPomodoros++;
+      daily.totalFocusSeconds += timeTotal;
+      saveDaily(daily);
+
+      if (currentPom < settings.pomodorosPerRound) {
+        // More pomodoros in this round -> short break
+        state = 'shortBreak';
+      } else {
+        // Last pomodoro in round -> long break
+        state = 'longBreak';
+      }
+    } else if (state === 'shortBreak') {
+      // After short break -> next pomodoro
+      currentPom++;
+      state = 'focus';
+    } else if (state === 'longBreak') {
+      // After long break -> new round
+      currentRound++;
+      currentPom = 1;
+      state = 'focus';
+    }
+
+    resetTimerForState();
+    updateUI();
+    updateStartButton();
+    playAlarmRepeat();
+
+    // Browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const meta = STATE_META[state];
+      new Notification('🍅 番茄钟', {
+        body: '时间到！下一阶段：' + meta.label,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍅</text></svg>'
+      });
+    }
+
+    showToast('⏰ 时间到！进入「' + STATE_META[state].label + '」');
+  }
+
+  // ──────────────────────────────────────
+  // UI updates
+  // ──────────────────────────────────────
+  function formatTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }
+
+  function updateTimerDisplay() {
+    $timer.textContent = formatTime(timeLeft);
+    // Ring
+    const fraction = timeTotal > 0 ? timeLeft / timeTotal : 0;
+    $ring.setAttribute('stroke-dashoffset', CIRCUMFERENCE * (1 - fraction));
+
+    // Page title
+    const meta = STATE_META[state];
+    document.title = formatTime(timeLeft) + ' - ' + meta.label + ' 🍅';
+
+    // Pulse when ending
+    if (timeLeft <= 5 && timeLeft > 0 && isRunning) {
+      $timer.classList.add('ending');
+    } else {
+      $timer.classList.remove('ending');
+    }
+  }
+
+  function updateUI() {
+    updateTimerDisplay();
+
+    // State label
+    const meta = STATE_META[state];
+    $label.textContent = meta.label;
+    $label.className = 'timer-label ' + meta.cls;
+
+    // Ring color
+    $ring.className = 'ring-progress ' + meta.cls;
+
+    // Start button color
+    $btnStart.className = 'btn btn-primary ' + meta.cls;
+
+    // Progress info
+    $round.textContent = currentRound + ' / ' + settings.dailyGoal;
+    $pom.textContent = currentPom + ' / ' + settings.pomodorosPerRound;
+    $todayP.textContent = daily.completedPomodoros + ' 🍅';
+
+    const totalMin = Math.floor(daily.totalFocusSeconds / 60);
+    if (totalMin >= 60) {
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      $todayT.textContent = h + ' 小时 ' + m + ' 分钟';
+    } else {
+      $todayT.textContent = totalMin + ' 分钟';
+    }
+  }
+
+  function updateStartButton() {
+    if (isRunning) {
+      $btnStart.innerHTML = '⏸ 暂停';
+    } else if (timeLeft < timeTotal) {
+      $btnStart.innerHTML = '▶ 继续';
+    } else {
+      $btnStart.innerHTML = '▶ 开始';
+    }
+  }
+
+  // ──────────────────────────────────────
+  // Toast
+  // ──────────────────────────────────────
+  let toastTimer = null;
+  function showToast(msg) {
+    if (toastTimer) clearTimeout(toastTimer);
+    $toast.textContent = msg;
+    $toast.classList.add('show');
+    toastTimer = setTimeout(() => $toast.classList.remove('show'), 2500);
+  }
+
+  // ──────────────────────────────────────
+  // Button handlers
+  // ──────────────────────────────────────
+  $btnStart.addEventListener('click', () => {
+    if (isRunning) pauseTimer(); else startTimer();
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    resetTimer();
+    showToast('↺ 计时器已重置');
+  });
+
+  document.getElementById('btnSkip').addEventListener('click', () => {
+    skipSession();
+    showToast('⏭ 已跳过，进入「' + STATE_META[state].label + '」');
+  });
+
+  // Settings
+  document.getElementById('btnSettings').addEventListener('click', openSettings);
+  document.getElementById('btnClose').addEventListener('click', closeSettings);
+  $overlay.addEventListener('click', (e) => {
+    if (e.target === $overlay) closeSettings();
+  });
+
+  function openSettings() {
+    stopAlarm();
+    if (isRunning) pauseTimer();
+    document.getElementById('setFocus').value = settings.focusDuration;
+    document.getElementById('setShortBreak').value = settings.shortBreakDuration;
+    document.getElementById('setLongBreak').value = settings.longBreakDuration;
+    document.getElementById('setPomodorosPerRound').value = settings.pomodorosPerRound;
+    document.getElementById('setDailyGoal').value = settings.dailyGoal;
+    $overlay.classList.add('open');
+  }
+
+  function closeSettings() {
+    $overlay.classList.remove('open');
+  }
+
+  document.getElementById('btnSave').addEventListener('click', () => {
+    const newSettings = {
+      focusDuration:       Math.max(1, Math.min(120, +document.getElementById('setFocus').value || 25)),
+      shortBreakDuration:  Math.max(1, Math.min(60,  +document.getElementById('setShortBreak').value || 5)),
+      longBreakDuration:   Math.max(1, Math.min(120, +document.getElementById('setLongBreak').value || 15)),
+      pomodorosPerRound:   Math.max(1, Math.min(10,  +document.getElementById('setPomodorosPerRound').value || 4)),
+      dailyGoal:           Math.max(1, Math.min(20,  +document.getElementById('setDailyGoal').value || 5))
+    };
+    saveSettings(newSettings);
+    settings = newSettings;
+
+    // If idle (not started), reset timer to match new settings
+    if (!isRunning && timeLeft === timeTotal) {
+      resetTimerForState();
+    }
+
+    // Clamp current pomodoro if settings changed
+    if (currentPom > settings.pomodorosPerRound) {
+      currentPom = settings.pomodorosPerRound;
+    }
+
+    updateUI();
+    updateStartButton();
+    closeSettings();
+    showToast('✓ 设置已保存');
+  });
+
+  document.getElementById('btnResetDaily').addEventListener('click', () => {
+    daily = { completedPomodoros: 0, totalFocusSeconds: 0 };
+    saveDaily(daily);
+    updateUI();
+    closeSettings();
+    showToast('🗑 今日数据已重置');
+  });
+
+  // ──────────────────────────────────────
+  // Keyboard shortcuts
+  // ──────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return; // ignore when typing in inputs
+    if ($overlay.classList.contains('open')) {
+      if (e.key === 'Escape') { closeSettings(); e.preventDefault(); }
+      return;
+    }
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        if (isRunning) pauseTimer(); else startTimer();
+        break;
+      case 'r':
+      case 'R':
+        resetTimer();
+        showToast('↺ 计时器已重置');
+        break;
+      case 's':
+      case 'S':
+        skipSession();
+        showToast('⏭ 已跳过，进入「' + STATE_META[state].label + '」');
+        break;
+    }
+  });
+
+  // ──────────────────────────────────────
+  // Check for day change every minute
+  // ──────────────────────────────────────
+  setInterval(() => {
+    const key = getDailyKey();
+    const storedKey = localStorage.getItem(DAILY_KEY_PREFIX + 'last_key');
+    if (storedKey !== key) {
+      // New day!
+      daily = { completedPomodoros: 0, totalFocusSeconds: 0 };
+      saveDaily(daily);
+      localStorage.setItem(DAILY_KEY_PREFIX + 'last_key', key);
+      updateUI();
+    }
+  }, 60000);
+
+  // Store today's key for day-change detection
+  localStorage.setItem(DAILY_KEY_PREFIX + 'last_key', getDailyKey());
+
+  // ──────────────────────────────────────
+  // Init
+  // ──────────────────────────────────────
+  resetTimerForState();
+  updateUI();
+  updateStartButton();
+
+})();
+</script>
+
+</body>
+</html>
