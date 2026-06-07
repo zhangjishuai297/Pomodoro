@@ -410,6 +410,117 @@
     animation: pulse 0.8s ease-in-out 3;
   }
 
+  /* ---- Pomodoro Dots ---- */
+  .pom-dots {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+  }
+
+  .pom-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--surface2);
+    transition: all 0.4s ease;
+  }
+
+  .pom-dot.done {
+    background: var(--accent-focus);
+    box-shadow: 0 0 6px rgba(232, 93, 93, 0.4);
+  }
+
+  .pom-dot.current {
+    background: var(--accent-focus);
+    box-shadow: 0 0 10px rgba(232, 93, 93, 0.6);
+    animation: dotPulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes dotPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.6); }
+  }
+
+  /* ---- Goal Progress Bar ---- */
+  .goal-bar-wrap {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .goal-bar-outer {
+    width: 100%;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .goal-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-focus), var(--accent-long));
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    width: 0%;
+  }
+
+  .goal-bar-text {
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  /* ---- Celebration ---- */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 300;
+  }
+
+  .confetti-piece {
+    position: absolute;
+    top: -40px;
+    font-size: 28px;
+    animation: confettiFall 3s ease-in forwards;
+  }
+
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+  }
+
+  .goal-badge {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    background: var(--surface);
+    border: 2px solid var(--accent-long);
+    border-radius: 24px;
+    padding: 24px 32px;
+    text-align: center;
+    z-index: 310;
+    pointer-events: none;
+    animation: badgePop 3s ease forwards;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  }
+
+  .goal-badge .emoji { font-size: 48px; display: block; }
+  .goal-badge .msg   { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 8px; }
+  .goal-badge .sub   { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  @keyframes badgePop {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    15%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    25%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    85%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+  }
+
   /* ---- Responsive ---- */
   @media (max-width: 400px) {
     .timer-wrapper { width: 240px; height: 240px; }
@@ -438,6 +549,7 @@
     </svg>
     <div class="timer-content">
       <div class="timer-time" id="timerDisplay">25:00</div>
+      <div class="pom-dots" id="pomDots"></div>
       <div class="timer-label focus" id="stateLabel">专注</div>
     </div>
   </div>
@@ -460,6 +572,14 @@
       <span class="label">今日专注</span>
       <span class="value" id="todayFocusTime">0 分钟</span>
     </div>
+  </div>
+
+  <!-- Goal Progress Bar -->
+  <div class="goal-bar-wrap">
+    <div class="goal-bar-outer">
+      <div class="goal-bar-fill" id="goalBarFill"></div>
+    </div>
+    <span class="goal-bar-text" id="goalBarText">今日目标 0/5 轮</span>
   </div>
 
   <!-- Controls -->
@@ -536,6 +656,16 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Confetti container -->
+<div class="confetti-container" id="confetti"></div>
+
+<!-- Goal badge -->
+<div class="goal-badge" id="goalBadge" style="display:none">
+  <span class="emoji">🎉</span>
+  <span class="msg">目标达成！</span>
+  <span class="sub">今天的努力有了回报</span>
+</div>
+
 <script>
 (function() {
   // ──────────────────────────────────────
@@ -549,8 +679,13 @@
   const $pom     = document.getElementById('pomodoroInfo');
   const $todayP  = document.getElementById('todayPomodoros');
   const $todayT  = document.getElementById('todayFocusTime');
-  const $toast   = document.getElementById('toast');
-  const $overlay = document.getElementById('overlay');
+  const $toast     = document.getElementById('toast');
+  const $overlay   = document.getElementById('overlay');
+  const $pomDots   = document.getElementById('pomDots');
+  const $goalFill  = document.getElementById('goalBarFill');
+  const $goalText  = document.getElementById('goalBarText');
+  const $confetti  = document.getElementById('confetti');
+  const $goalBadge = document.getElementById('goalBadge');
 
   const CIRCUMFERENCE = 2 * Math.PI * 140; // ~879.6
 
@@ -752,6 +887,10 @@
         state = 'shortBreak';
       } else {
         // Last pomodoro in round -> long break
+        // Check if daily goal is reached
+        if (currentRound === settings.dailyGoal) {
+          celebrate();
+        }
         state = 'longBreak';
       }
     } else if (state === 'shortBreak') {
@@ -809,6 +948,72 @@
     }
   }
 
+  function updatePomDots() {
+    const total = settings.pomodorosPerRound;
+    let html = '';
+    for (let i = 1; i <= total; i++) {
+      let cls = '';
+      if (state === 'focus') {
+        if (i < currentPom)      cls = 'done';
+        else if (i === currentPom) cls = 'current';
+      } else if (state === 'shortBreak') {
+        if (i <= currentPom)     cls = 'done';
+      } else if (state === 'longBreak') {
+        cls = 'done'; // all done, round complete
+      }
+      html += '<div class="pom-dot ' + cls + '"></div>';
+    }
+    $pomDots.innerHTML = html;
+  }
+
+  function updateGoalBar() {
+    // Daily goal progress: how many rounds have been fully completed
+    const completedRounds = Math.min(currentRound - 1, settings.dailyGoal);
+    // If we're in longBreak after the last pomodoro, that round is complete
+    let doneRounds = completedRounds;
+    if (state === 'longBreak') {
+      doneRounds = Math.min(currentRound, settings.dailyGoal);
+    }
+    const pct = Math.min(100, Math.round((doneRounds / settings.dailyGoal) * 100));
+    $goalFill.style.width = pct + '%';
+    $goalText.textContent = '今日目标 ' + doneRounds + '/' + settings.dailyGoal + ' 轮';
+  }
+
+  function celebrate() {
+    // Confetti
+    const emojis = ['🍅', '🎉', '✨', '🌟', '💪', '🔥', '🏆', '✅'];
+    for (let i = 0; i < 30; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      piece.style.left = Math.random() * 100 + '%';
+      piece.style.animationDelay = Math.random() * 1.5 + 's';
+      piece.style.fontSize = (20 + Math.random() * 24) + 'px';
+      $confetti.appendChild(piece);
+    }
+
+    // Goal badge
+    $goalBadge.style.display = 'block';
+    // Force reflow to restart animation
+    $goalBadge.style.animation = 'none';
+    $goalBadge.offsetHeight; // trigger reflow
+    $goalBadge.style.animation = '';
+
+    // Cleanup
+    setTimeout(() => {
+      $confetti.innerHTML = '';
+      $goalBadge.style.display = 'none';
+    }, 4000);
+
+    // Extra celebration sound
+    const ctx = getAudioCtx();
+    const now = ctx.currentTime;
+    playBeep(523, 0.15, now);
+    playBeep(659, 0.15, now + 0.12);
+    playBeep(784, 0.15, now + 0.24);
+    playBeep(1047, 0.4, now + 0.36); // C6 for extra cheer
+  }
+
   function updateUI() {
     updateTimerDisplay();
 
@@ -836,6 +1041,10 @@
     } else {
       $todayT.textContent = totalMin + ' 分钟';
     }
+
+    // Dots & goal bar
+    updatePomDots();
+    updateGoalBar();
   }
 
   function updateStartButton() {
