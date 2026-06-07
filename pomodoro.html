@@ -697,10 +697,6 @@
     updateUI();
     timerId = setInterval(tick, 200);
     updateStartButton();
-    // Request notification permission proactively
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
   }
 
   function pauseTimer() {
@@ -988,6 +984,11 @@
   resetTimerForState();
   updateUI();
   updateStartButton();
+
+  // Only request notification permission once at startup, never on every start click
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
 })();
 </script>
